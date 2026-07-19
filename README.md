@@ -31,6 +31,7 @@ from the languages that came before it.
 - [Tooling Status](#tooling-status)
 - [LSP Status](#lsp-status)
 - [Testing Policy](#testing-policy)
+- [Policies And Templates](#policies-and-templates)
 - [Roadmap](#roadmap)
 - [Architecture Decisions](#architecture-decisions)
 - [Major Decisions](#major-decisions)
@@ -766,6 +767,24 @@ Testing is strict by design:
 
 These rules are captured in ADR-015 (No InternalsVisibleTo For Tests) and
 ADR-016 (Strict Testing Policy).
+
+---
+
+## Policies And Templates
+
+The cross-project engineering policies and document templates for all
+MachineEnglish repositories live here:
+
+- [Policies](Policies) - engineering, SOLIDE design, naming, testing,
+  documentation, drift-resolution, work-done, and migration policies.
+- [Templates](Templates) - ADR, DFR, MAD, MD, RDMP, DIP, Specification, and
+  Semantic-rule document templates.
+
+This repository is their canonical cross-project home. Consuming repositories
+(MachineEnglish, MachineEnglish-Native) are assumed to be checked out as
+siblings and reference these folders by relative path. Snapshot refreshed
+2026-07-19 from the MachineEnglish repository; the copies there remain in place
+until that repository switches its links.
 
 ---
 
