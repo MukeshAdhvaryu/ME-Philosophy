@@ -23,6 +23,7 @@ from the languages that came before it.
 - [What ME Is](#what-me-is)
 - [The Ambition](#the-ambition)
 - [Why ME Is Different](#why-me-is-different)
+- [MEOS: The Sovereign Runtime OS](#meos-the-sovereign-runtime-os)
 - [SOLIDE And Spec Contracts](#solide-and-spec-contracts)
 - [Feature Comparison](#feature-comparison)
 - [Current Status](#current-status)
@@ -58,9 +59,12 @@ to make the implemented business rule readable by the analyst, operator, tester,
 or product owner who knows whether the rule is actually true.
 
 ME is currently strongest as a backend and domain-modelling language. The working
-foundation includes the compiler pipeline, LLVM backend, tree-walk interpreter,
-standard library wrappers, native runtime, LSP server, VS Code integration, MCP
-tooling, and cross-platform CI.
+foundation includes the compiler pipeline (dual parsers: a hand-written production
+parser with a generated ANTLR parity oracle), LLVM native backend, tree-walk
+interpreter, standard library plus native C runtime, an ownership-based memory
+model with an opt-in tracing GC, a green-thread runtime, a native OS windowing
+bridge proven live on screen, font rendering with HarfBuzz text shaping, LSP
+server, VS Code integration, MCP tooling, and cross-platform CI.
 
 ---
 
@@ -172,6 +176,8 @@ programming language." It is something larger.
 - A rendering engine that runs everywhere, faster than anything currently shipping
 - A windowing system that brings full development environments to platforms that
   have never had them
+- A sovereign runtime OS (MEOS) that runs ME directly on hardware, for secure
+  terminals and IoT-class devices, with no general-purpose OS underneath
 - A development environment — ME Dev Studio — that runs on the device in your bag
 
 Each of these individually is a product. Together they are a platform.
@@ -286,6 +292,110 @@ We are doing the work.
 | Output values | Output parameters do not require noisy call-site ceremony. |
 | Translation | English is the default canonical grammar, but the surface language is designed for deterministic natural-language translation. |
 | Migration | Existing ecosystems are treated as inputs, not enemies. |
+
+---
+
+## MEOS: The Sovereign Runtime OS
+
+> Founding decisions locked 2026-07-10 (MD-036). This is a design record with
+> implementation pending; open questions are stated openly below.
+
+### The Question Nobody Asks
+
+ME's granted US and UK patents define an application as one of exactly two
+things: something that does work in the background, or something that displays
+content, captures input, and dispatches it to an identified subscriber.
+
+MEOS starts from an uncomfortable question: if that is all an application is,
+why does it need a general-purpose operating system underneath it at all?
+
+Read the patent's own definition literally and the OS surface an application
+actually requires is: a display, input capture (mouse/keyboard), networking,
+and scheduling for background work. Everything else in a general-purpose OS -
+permission layers, service managers, package managers, multi-tenant ceremony -
+exists to referee many mutually-distrusting applications and vendors sharing
+one machine. A machine that only ever runs ME has no referee role to perform.
+
+MEOS is that reduction taken seriously: a tiny sovereign runtime OS that
+supplies exactly the hardware surface the application model names, and nothing
+else.
+
+This reduction has honest precedent - unikernels (MirageOS, IncludeOS,
+Unikraft), exokernels, Lisp machines, Smalltalk, Microsoft Singularity. Those
+projects validated the architecture and stayed niche for a named reason:
+driver breadth, not design. MEOS treats that as a scoping constraint, not a
+footnote - the driver boundary (GPU/display, USB HID, NIC, physical memory) is
+recorded as the one part of the reduction that does not shrink.
+
+### The Secure Terminal: Eliminating a Vulnerability Class
+
+MEOS extends ME's Verified Operating Surface model to bare metal. On a MEOS
+terminal, a UI element is pixels blitted at a screen location. There is no DOM
+node. No accessibility tree. No addressable handle. No synthetic-input API. No
+remote-desktop equivalent, by design.
+
+Injection attacks - the XSS class - require a substrate to inject into. MEOS
+removes the substrate. This is a structural elimination of the vulnerability
+class, the same relationship Rust's ownership model has to buffer overflows in
+safe code: not mitigated, gone.
+
+The claims are deliberately kept honest and separate, because the audience
+this is built for - banking, defense, government, critical infrastructure -
+deserves precision:
+
+| Claim | Status |
+|---|---|
+| Zero injection (XSS class) | Structural: no addressable handle exists to inject into. |
+| Remote input forgery | Excluded by construction: no synthetic-input API, no remote-desktop surface. |
+| Zero RCE | A separate claim resting on the network stack; never conflated with the above. |
+| UI spoofing | Not solved by the no-handle model; a trusted-path signal is a named open requirement. |
+| Malicious HID hardware (BadUSB) | Named openly; policy option: built-in HID only, closing the gap by construction. |
+
+Every MEOS terminal proves *which physical terminal* is calling a backend via
+a hardware-sealed, non-exportable signing key (TPM / Secure Enclave class,
+challenge-response only) - device attestation reusing ME's identity primitive
+(MD-035), not a second key model. Device attestation and input authenticity
+are tracked as distinct, non-substituting guarantees.
+
+### Two Deployment Targets
+
+| Target | Profile |
+|---|---|
+| Tiny embedded OS for IoT | Resource-constrained silicon; arena-only memory model (already shipped in the compiler's embedded profile); minimal driver surface. |
+| Fully secluded secure terminal | Regulated industries: banking, defense, government. No-handle UI, device attestation, no general-purpose OS attack surface underneath. |
+
+### Where MEOS Stands
+
+| Pillar | State |
+|---|---|
+| Patent-grounded application reduction | ✅ Locked |
+| Hardware driver boundary | 🚧 Bring-up path (bare metal vs. UEFI/minimal HAL) and target architecture are open decisions |
+| No-handle UI model extended to bare metal | ✅ Locked; trusted-path signal and external-HID policy open |
+| Networking as essential surface | ✅ Locked; network stack named as the primary remaining attack surface |
+| Device identity and attestation | ✅ Locked; reuses the hardware-sealed key primitive |
+| Deployment targets (IoT + secure terminal) | ✅ Locked |
+
+The groundwork MEOS sits on is already shipped: the embedded compilation
+profile with its arena memory model, the native windowing and rendering
+stack, the ownership memory model, and the toolchain seam reserved for the
+MEOS target. The genuinely open compiler work is register-level hardware
+access (unsafe register writes, `volatile` fields, ROM/flash-mapped
+constants) - tracked, scoped, and small compared to what is done.
+
+### The Enterprise Fit
+
+MEOS is not a hobby kernel. It is scoped for the organisations that buy
+hardened terminals by the tens of thousands: banks, defense contractors,
+governments, critical-infrastructure operators - and for the systems partners
+who serve them. A single-purpose, attestable, injection-free terminal whose
+entire software stack is readable by the domain experts who commission it is
+a different product category from a locked-down general-purpose PC.
+
+This is the layer of the stack where MachineEnglish is explicitly seeking an
+enterprise systems partner: an organisation with deep hardware reach,
+security-certification experience, and standing relationships in regulated
+industries. The language, compiler, and toolchain are working today; MEOS is
+the piece designed to be built with a partner, not alone.
 
 ---
 
@@ -658,38 +768,53 @@ They answer it with a compiler.
 
 ## Current Status
 
+> Snapshot: 2026-07-19, derived from the master status ledger in the MachineEnglish repository.
+
 | Area | Status | Notes |
 |---|---:|---|
 | Core contracts and public interfaces | ✅ Shipped | Shared public API, diagnostics, interfaces, language content. |
-| Compiler pipeline and semantic engine | ✅ Shipped | Parse, AST, semantic analysis, compile options, LSP query helpers. |
-| LLVM backend | ✅ Shipped | Native LLVM facade and backend implementation. |
-| Backend contract tests | ✅ Shipped | Contract suite pattern established. |
-| Tree-walk interpreter | ✅ Shipped | Runtime execution path independent from LLVM. |
-| Platform abstraction | ✅ Shipped | OS/toolchain abstraction layer. |
-| CLI tooling | ✅ Shipped | Compile, grammar/bootstrap tools, MCP, Roslyn helper, VS Code packaging, LSP launcher. |
-| LSP server | ✅ Shipped | stdio OmniSharp language server. |
+| Compiler pipeline and semantic engine | ✅ Shipped | Dual parsers over one shared pipeline: hand-written recursive-descent production parser plus generated ANTLR parity oracle; AST, semantic analysis, flow analysis, IR builder. |
+| LLVM backend | ✅ Shipped | Lean C-API facade with direct P/Invoke into `libLLVM`; DWARF/PDB debug information. |
+| Backend contract tests | ✅ Shipped | Contract suite pattern: one behavioral contract executed against every backend. |
+| Tree-walk interpreter | ✅ Shipped | Runtime execution path independent from LLVM, over the same IR. |
+| Memory model | ✅ Shipped | Ownership model as universal baseline; opt-in tracing GC on desktop (shadow-stack marking, collection element tracing, GC-tracked text values); embedded bump-pointer arena. Stop-the-world for cross-carrier collection still open. |
+| Green-thread runtime | 🚧 In progress | M:N scheduler with hand-written x64 context switch, async sleep parking, IOCP-based async TCP, process-async offload pool. ARM64 port and ME-surface `spawn` pending. |
+| Native OS windowing (GWS bridge) | 🚧 In progress | Win32 backend shipped; first ME program proven live on screen (animated bounce demo with mouse and keyboard input). X11/Cocoa/Android backends pending. |
+| Font rendering and text shaping | ✅ Shipped | stb_truetype rasterisation with a TrueType hinting port, HarfBuzz shaping (ligatures + kerning) proven end-to-end on screen, per-monitor DPI awareness. |
+| Platform abstraction | ✅ Shipped | OS/toolchain abstraction layer including Android NDK cross-compilation. |
+| CLI tooling (`me-tools`) | ✅ Shipped | Compile, format, REPL, ANTLR regeneration, WASM wrapper generation, migration, PDF, document index, MCP/Roslyn helper, VS Code packaging, LSP launcher. |
+| LSP server | ✅ Shipped | stdio language server with IntelliSense-level completion. |
 | LSP protocol tests | ✅ Shipped | Black-box JSON-RPC tests against the built server. |
 | VS Code extension | ✅ Shipped | File icons, TextMate grammar, language configuration, LSP client packaging. |
-| ME standard library wrappers | ✅ Shipped | Collections, text, IO, process/sys, net, math, crypto, encoding, temporal, optional, graphics. |
-| Native C runtime | ✅ Shipped | Runtime support for text, collections, IO, process, network, crypto, bitmap, etc. |
+| ME standard library | ✅ Shipped, evolving | Collections, text, IO, process/sys, net, math, crypto, encoding, temporal, optional, graphics, window. ME-first policy: new capability is written in ME; C only at the OS/ABI boundary. Public-facade / internal-implementation split under way. |
+| Native C runtime | ✅ Shipped | Text, collections, IO, process, network, crypto, bitmap, window, threads, GC. |
+| WASM interop | ✅ Shipped | `extern fn` over WASM modules; raw and WIT wrapper generation with cache, drift detection, eject/refresh. |
+| Self-hosting bootstrap | 🚧 In progress | Lexer, parser, and type checker already written in ME; IR emitter and self-compile phases pending. |
 | MCP server | ✅ Shipped | Local tool server for code intelligence workflows. |
-| Architecture docs | ✅ Shipped | ADRs, roadmaps, handoff briefs. |
-| C# to ME migration work | 🚧 In progress | Migration policy and feasibility documents are being developed. |
+| Architecture docs | ✅ Shipped | ADRs, MDs, DFRs, roadmaps, specs, semantic rules, and a master status ledger. |
+| C# to ME migration | 🚧 In progress | Migration policy (R-001 to R-026) ratified; `me-tools migrate` ships the mechanical pass; broad migration ongoing. |
 
 ---
 
 ## Test Coverage
 
-| Test Project | Scope | Tests | Status |
-|---|---|---:|---:|
-| ME.IR.Tests | Compiler semantics and language rules | 1,868 | ✅ Active |
-| ME.Language.Tests | Language definition/lexer/parser metadata | 37 | ✅ Active |
-| ME.Backend.Tests | Backend contract suite (abstract base) | — | ✅ Active |
-| ME.LLVM.Tests | LLVM backend binding to backend contracts | 560 | ✅ Active |
-| ME.Interpreter.Tests | Interpreter behavior | 138 | ✅ Active |
-| ME.Platforms.Tests | Platform abstraction | 21 | ✅ Active |
-| ME.LSP.Tests | Black-box LSP protocol | 3 | ✅ Active |
-| | **Total** | **2,627** | |
+Testing is contract-first: language behavior is specified once in
+backend-independent abstraction suites and executed against every backend
+(LLVM native and tree-walk interpreter) through a shared fixture pattern, so a
+rule cannot pass on one backend and silently regress on another.
+
+| Layer | Scope | Size |
+|---|---|---|
+| Abstraction suites | Backend-independent language contracts, aligned one-to-one with the 18 spec documents and the Sem-* semantic rule files | 489 semantic rule rows traced |
+| Implementation suite | Contract suites bound to the real backends (LLVM, interpreter) plus compiler, LSP, platform, and tooling tests | 4,494 tests listed at the 2026-06-01 inventory; the suite has grown since |
+| Native E2E programs | Real compile-link-run proofs in `examples/` (console test suite, on-screen window demos) | Growing suite; mandatory for every shipped feature |
+
+Two additional gates apply before any work item is marked done:
+
+- Tests must be green in **both** parser modes - the Handmade production
+  parser and the ANTLR parity oracle.
+- Compile-only success is never accepted as proof. A native executable must
+  be compiled, linked, run, and its output read (Work-Done Policy).
 
 ---
 
@@ -709,16 +834,18 @@ binaries via LLVM and is verified by CI on every push.
 Self-contained `me-tools` binaries are published as GitHub Actions artifacts on
 every CI run with 30-day retention.
 
-Recently shipped:
+Recently shipped (mid-2026):
 
 | What | Detail |
 |---|---|
-| Native LLVM backend | Replaced third-party .NET LLVM bindings with a lean C API facade and direct P/Invoke into `libLLVM`. |
-| Cross-platform CI | GitHub Actions matrix covers Windows x64, Linux x64, and macOS arm64. |
-| Android arm64 target | `OsPlatform.Android`, `AndroidToolchain`, NDK r27c, target `aarch64-linux-android33`, with CI smoke tests. |
-| ME stdlib wrappers | Collections, Text, Math, Encoding, Crypto, Optional, Temporal, IO, Sys, Net, and Graphics wrappers over native runtime support. |
-| Self-contained artifacts | Platform-specific `me-tools` artifacts are published by CI. |
-| `extern fn` plus entity proof | Entity methods can call C ABI extern declarations, which is the foundation for stdlib wrappers. |
+| Dual-surface comparison operators | `x.below[y]`-family method form folds to the identical infix IR in both parser modes (EXP-019), with matching LSP completion. |
+| Native OS window bridge | Windowing C ABI with a Win32 backend; the first ME program proven live on screen - window, animated bouncing box, mouse and keyboard input. |
+| Text on screen | stb_truetype rasterisation with a TrueType hinting port and HarfBuzz shaping (ligatures + kerning), proven end-to-end from ME code, with per-monitor DPI awareness. |
+| Tracing GC hardening | Shadow-stack marking, collection element tracing, sum-type payload rooting, GC-tracked text values, iterative mark phase; ownership model remains the universal baseline. |
+| Green-thread runtime | Hand-written x64 context switch, M:N scheduler, async sleep parking, IOCP-based async TCP, process-async offload pool. |
+| Real vtable dispatch | Whole-program interface dispatch wired on the native backend. |
+| WASM interop | `me-tools wrap wasm` generates ME wrappers for WASM modules in raw and WIT modes, with cache, drift detection, and eject/refresh. |
+| Public/internal stdlib split | ME.Native public facade with internal implementation modules; facade parity enforced. |
 
 ---
 
@@ -726,15 +853,23 @@ Recently shipped:
 
 | Tooling capability | Status | Notes |
 |---|---:|---|
-| Compile `.me` files | ✅ Shipped | CLI entry point into the compiler/backend pipeline. |
+| Compile `.me` files | ✅ Shipped | CLI entry point into the compiler/backend pipeline, both parser modes, project-level `load`. |
+| Formatter | ✅ Shipped | `me-tools format` with check-only mode. |
+| REPL | ✅ Shipped | `me-tools repl`. |
 | LSP server | ✅ Shipped | stdio server used by editor integrations. |
-| Roslyn code intelligence | ✅ Shipped | Used for C# symbol analysis. |
+| Roslyn code intelligence | ✅ Shipped | Used for C# symbol analysis via a local MCP daemon. |
 | MCP setup/start | ✅ Shipped | Local machine intelligence server integration. |
 | VS Code packaging/install | ✅ Shipped | Packages extension assets, grammar, language config, and client code. |
-| ANTLR generation | ✅ Shipped | Current grammar toolchain support. |
-| Lexer/parser TSV import/export | ✅ Shipped | Supports grammar migration/bootstrap work. |
-| Lexer/parser/semantic bootstrap | ✅ Shipped | Supports self-hosting and grammar/spec audit work. |
-| Document index generator | 🔜 Planned | Next tool task: regenerate public and internal document index pages automatically. |
+| ANTLR generation | ✅ Shipped | `me-tools antlr` regenerates the oracle parser with mandatory post-processing. |
+| WASM wrapper generation | ✅ Shipped | `me-tools wrap wasm`, raw + WIT modes, cache/drift/eject/refresh. |
+| C# to ME migration | ✅ Shipped | `me-tools migrate` with mapping report; policy-governed (R-001 to R-026). |
+| Spec test-suite scaffolding | ✅ Shipped | `me-tools spec-suite` generates spec-aligned test suites. |
+| Document index generator | ✅ Shipped | `me-tools index` regenerates public and internal document index pages. |
+| PDF generation | ✅ Shipped | `me-tools pdf` renders markdown documents to PDF. |
+
+The former TSV/DB grammar pipeline (lexer/parser TSV import/export, bootstrap
+commands) was retired in July 2026. The `.g4` grammars and the `Sem-*.md`
+semantic rule documents stand alone as the authoritative language sources.
 
 ---
 
@@ -746,10 +881,11 @@ Recently shipped:
 | Diagnostics | ✅ Shipped | Compiler diagnostics published on open/save and live change debounce. |
 | Hover | ✅ Shipped | Uses compiler position queries. |
 | Go to definition | ✅ Shipped | Same-file and cross-file declaration resolution. |
-| Completion | ✅ Shipped | Keywords, current file declarations, and directly loaded module declarations. |
+| Completion | ✅ Shipped | IntelliSense-level (ADR-053): scope-aware, overload grouping, member access, chained return-type resolution, dual-surface operator completion, project-sibling type completion. |
 | Signature help | ✅ Shipped | ME square-bracket callable signatures. |
 | Find references | ✅ Shipped | Text-token workspace scan with identifier fallback. |
 | Rename | ✅ Shipped | Text-token workspace edit with prepareRename and identifier validation. |
+| Implementations navigation | 🚧 In progress | Solution-family navigation to spec implementations shipped; definition/references halves in progress. |
 | Syntax highlighting | ✅ Shipped | TextMate grammar in VS Code extension. |
 | Semantic tokens | 🔜 Planned | Should layer on top of compiler-aware symbol resolution. |
 | Code actions | 🔜 Planned | Candidate next LSP capability. |
@@ -765,8 +901,11 @@ Testing is strict by design:
 - Do not add production APIs only for tests.
 - If test pressure exposes a bad boundary, improve the product boundary.
 
-These rules are captured in ADR-015 (No InternalsVisibleTo For Tests) and
-ADR-016 (Strict Testing Policy).
+These rules are captured in ADR-015 (No InternalsVisibleTo For Tests) and the
+[Testing Standards Policy](Policies/TESTING-STANDARDS-POLICY.md). In addition,
+the Work-Done Policy requires a real compile-link-run native proof before any
+compiler, runtime, or stdlib feature may be marked done - compile-only success
+is never accepted as evidence.
 
 ---
 
@@ -794,15 +933,17 @@ until that repository switches its links.
 |---|---|---:|
 | Now | Backend core: types, callables, failure, entities | ✅ Shipped |
 | Now | Hello World end-to-end: LLVM pipeline | ✅ Shipped |
-| Now | Multi-file compilation, `load` resolution, `.meproject` | ✅ Shipped |
+| Now | Dual parsers: Handmade production + ANTLR parity oracle | ✅ Shipped |
+| Now | Multi-file compilation, module catalog, `.meproject` / `.mesln` | ✅ Shipped |
 | Now | Generics monomorphization | ✅ Shipped |
-| Now | Error channels (`fail`/`throw`) end-to-end | ✅ Shipped |
+| Now | Error channels (`fail`/`throw`) plus native fault routing (`on fault`) | ✅ Shipped |
 | Now | Pattern matching (`decide`) full lowering | ✅ Shipped |
 | Now | Diagnostics with file path and caret snippets | ✅ Shipped |
 | Now | Tree-walk interpreter | ✅ Shipped |
 | Now | `async`/`await` lowering | ✅ Shipped |
+| Now | Ownership memory model with opt-in tracing GC | ✅ Shipped |
 | Now | Debug information (DWARF / PDB) | ✅ Shipped |
-| Now | Language Server Protocol (LSP) | ✅ Shipped |
+| Now | LSP with IntelliSense-level completion | ✅ Shipped |
 | Now | Linux and macOS support | ✅ Shipped |
 | Now | Native I/O, process, and network runtimes plus wrappers | ✅ Shipped |
 | Now | `extern fn` ABI bindings and implicit void actions | ✅ Shipped |
@@ -810,48 +951,104 @@ until that repository switches its links.
 | Now | Cross-platform CI: Windows x64, Linux x64, macOS arm64 | ✅ Shipped |
 | Now | Android arm64 cross-compilation target | ✅ Shipped |
 | Now | Self-contained `me-tools` binaries published by CI | ✅ Shipped |
+| Now | WASM module interop (`wrap wasm`, raw + WIT) | ✅ Shipped |
+| Now | Native window bridge (Win32) - first ME program live on screen | ✅ Shipped |
+| Now | Font rasterisation + HarfBuzz text shaping on screen | ✅ Shipped |
+| Now | Auto-generated document index pages | ✅ Shipped |
+| Near | Green-thread runtime: ARM64 port + ME-surface `spawn` | 🚧 In progress |
+| Near | GWS: full Graphics and Windowing System (X11/Cocoa backends, event loop) | 🚧 In progress |
+| Near | Standard library expansion in ME (ME-first policy, facade/internal split) | 🚧 In progress |
+| Near | Self-hosting bootstrap: ME lexer/parser/type checker written in ME | 🚧 In progress |
 | Near | IaC compiler: ME to YAML | 🔜 Planned |
-| Near | Standard library expansion in ME | 🔜 Planned |
 | Near | Frontend: behavior-first UI | 🔜 Planned |
-| Near | GWS: Graphics and Windowing System | 🔜 Planned |
-| Near | Auto-generated document index pages | 🔜 Planned |
 | Mid | Project scaffolding | 📋 Designed |
 | Mid | Ecosystem interop: wrapper generation for .NET, JVM, npm | 📋 Designed |
-| Mid | Migration tools: C#, Java, TypeScript, YAML, CSS, HTML to ME | 📋 Designed |
-| Mid | Self-hosting bootstrap phases | 📋 Designed |
+| Mid | Migration tools: Java, TypeScript, YAML, CSS, HTML to ME | 📋 Designed |
+| Mid | Virtual window system + ME Dev Studio | 📋 Designed |
+| Mid | MEOS: sovereign runtime OS for secure terminals and IoT | 📋 Founding decisions locked |
 
 ---
 
 ## Architecture Decisions
 
-| ADR | Decision |
-|---|---|
-| ADR-001 | Backend test refactor |
-| ADR-002 | Remove ANTLR and replace with pure C# lexer/parser |
-| ADR-003 | C# as source of truth for language definitions |
-| ADR-004 | `Word<T>` interned identity |
-| ADR-005 | LLVM backend |
-| ADR-006 | Remove Ubiquity native LLVM facade |
-| ADR-007 | ME platform abstraction |
-| ADR-008 | Generics monomorphization |
-| ADR-009 | Bracketed generic syntax |
-| ADR-010 | Else/otherwise unification |
-| ADR-011 | Capability conflict resolution |
-| ADR-012 | `me_runtime` C standard library |
-| ADR-013 | LSP language server |
-| ADR-014 | Syntax highlighting |
-| ADR-015 | No `InternalsVisibleTo` for tests |
-| ADR-016 | Strict testing policy |
-| ADR-017 | C# to ME migration policy |
+38 of 41 ADRs are shipped. The full ledger with per-ADR status lives in the
+MachineEnglish repository's master status document; this is the decision list.
+
+| ADR | Decision | Status |
+|---|---|---:|
+| ADR-001 | Backend test refactor | ✅ |
+| ADR-002 | Pure C# lexer/parser as the production path (ANTLR retained as parity oracle) | ✅ |
+| ADR-003 | C# as source of truth for language definitions | ✅ |
+| ADR-004 | `Word<T>` interned identity | ✅ |
+| ADR-005 | LLVM backend | ✅ |
+| ADR-006 | Remove Ubiquity native LLVM facade | ✅ |
+| ADR-007 | ME platform abstraction | ✅ |
+| ADR-008 | Generics monomorphization | ✅ |
+| ADR-009 | Bracketed generic syntax | ✅ |
+| ADR-010 | Else/otherwise unification | ✅ |
+| ADR-011 | Capability conflict resolution | ✅ |
+| ADR-012 | `me_runtime` C standard library | ✅ |
+| ADR-013 | LSP language server | ✅ |
+| ADR-014 | Syntax highlighting | ✅ |
+| ADR-015 | No `InternalsVisibleTo` for tests | ✅ |
+| ADR-017 | C# to ME migration policy | ✅ |
+| ADR-018 | Factory-owned model entities | 🚧 |
+| ADR-019 | Partial declarations | ✅ |
+| ADR-020 | Metadata-only attributes | ✅ |
+| ADR-021 | `my` self-reference and `this` indexer | ✅ |
+| ADR-022 | Compiler hardening before production | ✅ |
+| ADR-023 | Error message constants | ✅ |
+| ADR-024 | Parentheses as bracket alias | ✅ |
+| ADR-025 | `omit` universal member removal | ✅ |
+| ADR-026 | Array and enumerable contracts | ✅ |
+| ADR-027 | Stdlib/runtime separation | ✅ |
+| ADR-028 | Public syntax belongs in grammar | ✅ |
+| ADR-029 | Tuple destructuring and selection syntax | ✅ |
+| ADR-030 | Constructor constraint syntax | ✅ |
+| ADR-031 | Stdlib wrapper entities are compiler-known | ✅ |
+| ADR-032 | Legacy migration work folder retirement | ✅ |
+| ADR-033 | CCC gates and conditional compilation | ✅ |
+| ADR-034 | Constructor declaration and migration rendering | ✅ |
+| ADR-035 | ME naming conventions | ✅ |
+| ADR-036 | Source-level debug information | ✅ |
+| ADR-037 | Modifier mixing rules | ✅ |
+| ADR-038 | Solution file format (`.mesln`) | ✅ |
+| ADR-039 | Async/sync concurrency model | ✅ |
+| ADR-040 | Goto and labels (`jump`/`mark`) | ✅ |
+| ADR-041 | Design and runtime state flags | 🚧 |
+| ADR-052 | Native test strategy after binding layer migration | 🚧 |
+| ADR-053 | LSP IntelliSense-level completion | ✅ |
+| ADR-055 | `is` replaces `from` as the type-guard keyword | ✅ |
 
 ---
 
 ## Major Decisions
 
-| Decision | Statement |
-|---|---|
-| MD-001 | Specs are pure contracts; default behavior belongs in named capabilities. |
-| MD-002 | C# authored language definitions are a major project direction. |
+Selected major decisions (MDs) that shape the language and platform. Statuses
+as of 2026-07-19.
+
+| Decision | Statement | Status |
+|---|---|---:|
+| MD-001 | Specs are pure contracts; default behavior belongs in named capabilities. | ✅ |
+| MD-002 | C#-authored language definitions are a major project direction. | 🚧 |
+| MD-003 | Compiler-recognised capability contracts (e.g. IEquatable vtable wiring). | ✅ |
+| MD-004 | Builtin variable type projection (`x.type`). | ✅ |
+| MD-006 | Bracket family aliases for readable adoption. | ✅ |
+| MD-008 | Minimal unique suffix resolution; `load` retired from `.me` files. | ✅ |
+| MD-011 | Inline statement termination at block close. | ✅ |
+| MD-013 | String model: single-quote literals, `$` interpolation, word-boundary termination. | ✅ |
+| MD-014 | `retry` as a compiler-enforced resilience primitive. | 🚧 Accepted |
+| MD-016 | `under` scoped context injection (Governance Context). | 🚧 Accepted |
+| MD-021 | Runtime capability foundation (GC, spans, fonts, threads, WASM: 22 of 71 items shipped). | 🚧 |
+| MD-022 / MD-027 | Ecosystem interop: WASM wrapper generation and import model. | ✅ |
+| MD-024 | Native binding modules and compiler-owned extern contracts. | 🚧 |
+| MD-025 | Extern out parameters: ABI lowering to C pointer parameters. | ✅ |
+| MD-032 | Native OS window bridge for ME.GWS. | 🚧 |
+| MD-033 / MD-034 | Green-thread runtime (M:N scheduler, async primitives). | 🚧 |
+| MD-035 | Identity: hardware-sealed, non-exportable device keys (TPM / Secure Enclave class) for attestation. | 🚧 Design locked |
+| MD-036 | MEOS: tiny sovereign runtime OS for embedded and secure-terminal targets. | 🚧 Founding decisions locked |
+| MD-038 | Symbol surface reform: `@keyword` escape, backtick possessive, dot/`` `s `` split. | 🚧 Accepted |
+| MD-039 | Hyphen law: tight hyphen binds names (kebab identifiers), spaced hyphen is minus. | 🚧 Accepted |
 
 ---
 
