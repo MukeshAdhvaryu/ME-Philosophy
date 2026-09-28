@@ -45,12 +45,12 @@ plain English form or developer shorthand. Neither form is second-class.
 
 ```me
 // English form
-Add be integer use [a as integer, b as integer] [
+Add (a as integer, b as integer) [
     be a plus b
 ]
 
 // Developer form
-Add = integer [a as integer, b as integer] => a plus b
+Add (a as integer, b as integer) => a plus b
 ```
 
 That matters because most languages are only readable by developers. ME is trying
