@@ -66,6 +66,89 @@ model with an opt-in tracing GC, a green-thread runtime, a native OS windowing
 bridge proven live on screen, font rendering with HarfBuzz text shaping, LSP
 server, VS Code integration, MCP tooling, and cross-platform CI.
 
+### One Source, Many Languages
+
+The same surface is open to natural languages other than English. A language
+pack (`Hindi.me`, `Welsh.me`) maps each keyword and base type to a word in that
+language, and the lexer normalises every translated word back to the one
+canonical spelling. A team in Mumbai and a team in Wales can therefore read and
+write the same source in their own language, and `me-tools translate` renders a
+file between them without changing its meaning. The two examples below are the
+output of `me-tools translate` on the English snippet (names the author chose,
+such as `Invoice` and `Classify`, are not translated):
+
+```me
+// English
+entity Invoice
+[
+    total as decimal
+    paid as yesno
+]
+
+Classify (x as integer)
+[
+    if x below 5
+    [
+        be 'small';
+    ]
+    else
+    [
+        be 'large';
+    ]
+]
+```
+
+```me
+// Hindi (हिन्दी)
+इकाई Invoice
+[
+    total होगा दशमलव
+    paid होगा उत्तर
+]
+
+Classify (x होगा पूर्णांक)
+[
+    अगर x कम 5
+    [
+        बने 'small';
+    ]
+    अन्यथा
+    [
+        बने 'large';
+    ]
+]
+```
+
+```me
+// Welsh (Cymraeg)
+endid Invoice
+[
+    total fel degol
+    paid fel ateb
+]
+
+Classify (x fel cyfanrif)
+[
+    os x llai 5
+    [
+        bydd 'small';
+    ]
+    arall
+    [
+        bydd 'large';
+    ]
+]
+```
+
+The two packs were picked to be as different from English, and from each other,
+as possible: Hindi is in Devanagari script, and Welsh is in Latin script with
+diacritics and a verb-first sentence order. Be honest about the state of them:
+both are first drafts. The spellings are provisional, the Welsh pack has not
+been reviewed by a Welsh speaker, and some entries are constructed words that
+carry a programming concept rather than established vocabulary. Expert review is
+planned before the final ME release (DFR-367). Web and DOM events, infrastructure
+tool names, native binding names and symbol-only tokens stay English by design.
+
 ---
 
 ## The Ambition
@@ -764,6 +847,7 @@ They answer it with a compiler.
 | Named tuple partial selection | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Spec contracts enforced by compiler | ✅ | ❌ | ❌ | ❌ | ❌ | partial |
 | Declared value validation beside the failure channel (`only( ... )`) | ✅ | partial | partial | partial | partial | partial |
+| Deterministic translation of the surface language into other natural languages (`me-tools translate`) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ---
 
