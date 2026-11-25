@@ -763,6 +763,7 @@ They answer it with a compiler.
 | Deterministic multiple inheritance | ✅ | complex | ❌ | ❌ | ❌ | ❌ |
 | Named tuple partial selection | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Spec contracts enforced by compiler | ✅ | ❌ | ❌ | ❌ | ❌ | partial |
+| Declared value validation beside the failure channel (`only( ... )`) | ✅ | partial | partial | partial | partial | partial |
 
 ---
 
@@ -806,7 +807,7 @@ rule cannot pass on one backend and silently regress on another.
 | Layer | Scope | Size |
 |---|---|---|
 | Abstraction suites | Backend-independent language contracts, aligned one-to-one with the 18 spec documents and the Sem-* semantic rule files | 489 semantic rule rows traced |
-| Implementation suite | Contract suites bound to the real backends (LLVM, interpreter) plus compiler, LSP, platform, and tooling tests | 4,494 tests listed at the 2026-06-01 inventory; the suite has grown since |
+| Implementation suite | Contract suites bound to the real backends (LLVM, interpreter) plus compiler, LSP, platform, and tooling tests | 10,865 passed, 6 failed and 2,183 skipped in the full run of 2026-11-25 (commit `07da68f26`, Handmade parser); the skipped are mainly ANTLR-mode rows that run only in a periodic oracle pass |
 | Native E2E programs | Real compile-link-run proofs in `examples/` (console test suite, on-screen window demos) | Growing suite; mandatory for every shipped feature |
 
 Two additional gates apply before any work item is marked done:
